@@ -1,0 +1,87 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description" : "This CFT will createa 2-tier architecture",
+    
+    "Parameters" : {
+        "InstanceTypeParm" : {
+            "Type" : "String",
+            "Default" : "t2.micro",
+            "AllowedValues" : [ "t2.micro" , "t2.nano" , "t2.small"]
+        },
+        "KeyNameParm" : { "Type" : "String" },
+        
+        "VpcCidrParm": {
+            "Type" : "String",
+            "Description" : "Enter VPC CIDR Block"
+        },
+        "PublicSubnetCidrParm" : {
+            "Type" : "String",
+            "Description" : "Enter Public Subnet CIDR Block"
+        }
+    },
+    
+    "Mappings" : {
+        "RegionMap" : {
+            "us-east-1" : { "64" : "ami-033b95fb8079dc481" }
+        }
+    },
+    
+    "Resources" : {
+        "AwsFoundationVpc" : {
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" : { "Ref" : "VpcCidrParm" },
+                "Tags" : [ { "Key" : "Name", "Value" : "aws-foundation-cft-vpc"}]
+            }
+        },
+        
+        "AwsFoundationPublicSubnet" : {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn::GetAZs" : { "Ref" : "AWS::Region" }}]},
+                "CidrBlock" : { "Ref" : "PublicSubnetCidrParm" },
+                "MapPublicIpOnLaunch" : "True" ,
+                "Tags" : [ { "Key" : "Name", "Value" : "aws-foundation-cft-pub-subnet" }],
+                "VpcId" : { "Ref" : "AwsFoundationVpc" }
+            }
+        },
+        
+        "AwsFoundationPubSubnetSecurityGrp" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "DependsOn" : "AwsFoundationVpc",
+            "Properties" : {
+                "GroupName" : "SecurityGroupForPublicSubnet",
+                "GroupDescription" : "SecurityGroupForPublicSubnet",
+                "SecurityGroupIngress" : [
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : "22",
+                        "ToPort" : "22",
+                        "CidrIp" : "0.0.0.0/0"
+                    }
+                ],
+                "Tags" : [ { "Key" : "Name", "Value" : "aws-foundation-cft-public-security-grp" } ],
+                "VpcId" : { "Ref" : "AwsFoundationVpc" }
+            }
+        },
+        
+        "AwsFoundationPubEc2Instance" : {
+            "Type" : "AWS::EC2::Instance",
+            "DependsOn" : "AwsFoundationPublicSubnet",
+            "Properties" : {
+                "ImageId" : "ami-033b95fb8079dc481",
+                
+                "InstanceType" : { "Ref" : "InstanceTypeParm" },
+                "SubnetId" : { "Ref" : "AwsFoundationPublicSubnet" },
+                
+                "Tags" : [
+                    { "Key" : "Name", "Value" : "CFinstance" },
+                    { "Key" : "Env", "Value" : "Training" }
+                ],
+                
+                "SecurityGroupIds" : [ { "Ref" : "AwsFoundationPubSubnetSecurityGrp" } ],
+                "KeyName" : { "Ref" : "KeyNameParm" }
+            }
+        }
+    }
+}
